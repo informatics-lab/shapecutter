@@ -3,6 +3,7 @@
 import warnings
 
 import iris
+import numpy as np
 # import xarray as xr
 
 
@@ -65,6 +66,7 @@ class IrisCubeDataProvider(_DataProvider):
         self.data_source = self.data_source.intersection(**translate_kwarg)
 
     def apply_mask(self, other, mask_2d, dims_2d):
+        print(f"[apply_mask] - Other shape: {other.shape}, mask_shape: {mask_2d.shape}")
         full_mask = iris.util.broadcast_to_shape(mask_2d, other.shape, dims_2d)
         new_data = np.ma.array(other.data, mask=np.logical_not(full_mask))
         return other.copy(data=new_data)

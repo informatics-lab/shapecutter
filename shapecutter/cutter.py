@@ -1,7 +1,7 @@
-"""Cut Iris cubes to shapely geometries."""
+"""Cut gridded raster datasets to shapely geometries."""
 
-import iris
 import numpy as np
+from shapely.geometry import box
 
 from .providers import select_best_data_provider, select_best_geometry_provider
 
@@ -32,7 +32,8 @@ def _dateline_centre(max_x):
 
 class Cutter(object):
     """Cut raster data around a shapely geometry."""
-    def __init__(self, data_source, geometry_source):
+    def __init__(self, data_source, geometry_source,
+                 ignore_errors=True):
         """
         Set up a cutter to cut data out of `data_source` from geometries
         provided by `geometry_source`.
@@ -40,13 +41,14 @@ class Cutter(object):
         """
         self.data_source = data_source
         self.geometry_source = geometry_source
+        self.ignore_errors = ignore_errors
 
         # TODO: fully implement.
         self.data_provider = select_best_data_provider(data_source)
         self.geometry_provider = select_best_geometry_provider(geometry_source)
 
     def _translate_to_geometry(self, geometry_ref):
-        """Translate the x-coord of a cube to match the x-coord interval of the geometry."""
+        """Translate the x-coord of a dataset to match the x-coord interval of the geometry."""
         geom_xmax = self.geometry_provider.get_named_bound(geometry_ref, 'maxx')
         xc_name = self.data_provider.coords(axis="x", dim_coords=True)[0].name()
         cube_xmax = self.data_provider.coord(xc_name).points[-1]
@@ -81,7 +83,7 @@ class Cutter(object):
 
     def geometry_boundary_mask(self, dataset, geometry_ref):
         """
-        Generate a 2D horizontal mask for the cube based on the boundary
+        Generate a 2D horizontal mask for the dataset based on the boundary
         of the geometry.
 
         Note: the geometry is assumed to be provided by a geodataframe.
@@ -89,10 +91,10 @@ class Cutter(object):
         TODO: cache boundary masks for specific geometries.
 
         """
-        self._translate_to_geometry(dataset, geometry_ref)
+        # self._translate_to_geometry(dataset, geometry_ref)
 
-        x_coord = self.data_provider.coords(axis="x", dim_coords=True)[0]
-        y_coord = self.data_provider.coords(axis="y", dim_coords=True)[0]
+        x_coord = dataset.coords(axis="x", dim_coords=True)[0]
+        y_coord = dataset.coords(axis="y", dim_coords=True)[0]
 
         # XXX this may be improvable: perhaps by iterating over cells in a 2D slice directly?
         geometry = self.geometry_provider[geometry_ref]
@@ -107,20 +109,24 @@ class Cutter(object):
             mask_point = geometry.intersects(cell)
             flat_mask.append(mask_point)
 
-        return np.array(flat_mask).reshape(self.data_provider.shape[-2:])
+        return np.array(flat_mask).reshape(dataset.shape[-2:])
 
     def _cut_to_boundary(self, subset, geometry_ref):
         """Mask `subset` tightly to the geometry of the polygon."""
         try:
-            cube_2d, dims_2d = _get_2d_field_and_dims(subset)
-            mask_2d = geometry_boundary_mask(subset, geometry_ref)
+            _, dims_2d = _get_2d_field_and_dims(subset)
+            mask_2d = self.geometry_boundary_mask(subset, geometry_ref)
         except:
-            result = None
+            if self.ignore_errors:
+                result = None
+            else:
+                raise
         else:
+            print(f"[_boundary] - subset shape: {subset.shape}, mask shape: {mask_2d.shape}")
             result = self.data_provider.apply_mask(subset, mask_2d, dims_2d)
         return result
 
-    def cut_cube(self, geometry_ref, to="bbox"):
+    def cut_dataset(self, geometry_ref, to="bbox"):
         """
         Subset the input cube to the boundary of the shapefile geometry.
 
@@ -135,6 +141,7 @@ class Cutter(object):
         """
         # 1. extract subset to the shapefile's bounding box.
         subset = self.geometry_bbox_dataset(geometry_ref)
+        print(f"[cut_dataset] - subset shape: {subset.shape}")
 
         if to == "bbox":
             result = subset
