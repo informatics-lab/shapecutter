@@ -1,5 +1,6 @@
 """Cut Iris cubes to shapely geometries."""
 
+import iris
 import numpy as np
 
 from .providers import select_best_data_provider, select_best_geometry_provider
@@ -41,25 +42,23 @@ class Cutter(object):
         self.geometry_source = geometry_source
 
         # TODO: fully implement.
-        # self.data_provider = select_best_data_provider(data_source)
+        self.data_provider = select_best_data_provider(data_source)
         self.geometry_provider = select_best_geometry_provider(geometry_source)
 
-    def _translate_cube_to_geometry(self, geometry_ref):
+    def _translate_to_geometry(self, geometry_ref):
         """Translate the x-coord of a cube to match the x-coord interval of the geometry."""
         geom_xmax = self.geometry_provider.get_named_bound(geometry_ref, 'maxx')
-        xc_name = self.data_source.coords(axis="x", dim_coords=True)[0].name()
-        cube_xmax = self.data_source.coord(xc_name).points[-1]
+        xc_name = self.data_provider.coords(axis="x", dim_coords=True)[0].name()
+        cube_xmax = self.data_provider.coord(xc_name).points[-1]
         geom_x_dateline_centre = _dateline_centre(geom_xmax)
         cube_x_dateline_centre = _dateline_centre(cube_xmax)
 
         if geom_x_dateline_centre != cube_x_dateline_centre:
             if cube_x_dateline_centre:
-                intersection_kwarg = {xc_name: (-180, 180)}
+                translation_kwarg = {xc_name: (-180, 180)}
             else:
-                intersection_kwarg = {xc_name: (0, 360)}
-            result = self.data_source.intersection(**intersection_kwarg)
-
-        return result
+                translation_kwarg = {xc_name: (0, 360)}
+            self.data_provider.translate(translation_kwarg)
 
     def geometry_bbox_dataset(self, geometry_ref):
         """
@@ -69,17 +68,16 @@ class Cutter(object):
         XXX not done: CRS handling.
 
         """
-        cube = self._translate_cube_to_geometry(geometry_ref)
+        self._translate_to_geometry(geometry_ref)
 
-        xc_name = cube.coords(axis="x", dim_coords=True)[0].name()
-        yc_name = cube.coords(axis="y", dim_coords=True)[0].name()
+        xc_name = self.data_provider.coords(axis="x", dim_coords=True)[0].name()
+        yc_name = self.data_provider.coords(axis="y", dim_coords=True)[0].name()
 
         min_x, min_y, max_x, max_y = self.geometry_provider.get_bounds_points(geometry_ref)
 
         coord_values = {xc_name: lambda cell: min_x <= cell <= max_x,
                         yc_name: lambda cell: min_y <= cell <= max_y}
-        cstr = iris.Constraint(coord_values=coord_values)
-        return cube.extract(cstr)
+        return self.data_provider.extract(coord_values)
 
     def geometry_boundary_mask(self, dataset, geometry_ref):
         """
@@ -91,14 +89,10 @@ class Cutter(object):
         TODO: cache boundary masks for specific geometries.
 
         """
-        cube = self._translate_cube_to_geometry(dataset, geometry_ref)
+        self._translate_to_geometry(dataset, geometry_ref)
 
-        x_coord = cube.coords(axis="x", dim_coords=True)[0]
-        y_coord = cube.coords(axis="y", dim_coords=True)[0]
-        
-        for coord in [x_coord, y_coord]:
-            if not coord.has_bounds():
-                coord.guess_bounds()
+        x_coord = self.data_provider.coords(axis="x", dim_coords=True)[0]
+        y_coord = self.data_provider.coords(axis="y", dim_coords=True)[0]
 
         # XXX this may be improvable: perhaps by iterating over cells in a 2D slice directly?
         geometry = self.geometry_provider[geometry_ref]
@@ -113,8 +107,7 @@ class Cutter(object):
             mask_point = geometry.intersects(cell)
             flat_mask.append(mask_point)
 
-        mask_2d = np.array(flat_mask).reshape(cube.shape[-2:])
-        return mask_2d
+        return np.array(flat_mask).reshape(self.data_provider.shape[-2:])
 
     def _cut_to_boundary(self, subset, geometry_ref):
         """Mask `subset` tightly to the geometry of the polygon."""
@@ -124,9 +117,7 @@ class Cutter(object):
         except:
             result = None
         else:
-            full_mask = iris.util.broadcast_to_shape(mask_2d, subset.shape, dims_2d)
-            new_data = np.ma.array(subset.data, mask=np.logical_not(full_mask))
-            result = subset.copy(data=new_data)
+            result = self.data_provider.apply_mask(subset, mask_2d, dims_2d)
         return result
 
     def cut_cube(self, geometry_ref, to="bbox"):

@@ -21,7 +21,7 @@ class _GeometryProvider(object):
 
     def _handle_geometry_ref(self, ref):
         if isinstance(ref, dict):
-            ref = list(ref.items())
+            ref, = list(ref.items())
         return ref[0], ref[1]
 
     def __repr__(self):
@@ -64,7 +64,7 @@ class CartopyGeometryProvider(_GeometryProvider):
         return repr_str
 
     def __getitem__(self, keys):
-        query_key, query_val = self._handle_geometry_ref(key)
+        query_key, query_val = self._handle_geometry_ref(keys)
         geom_uid = f"{query_key},{query_val}"
         if geom_uid not in self._geom_lookup.keys():
             for rcd in self.geometry_source.records():
