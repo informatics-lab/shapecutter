@@ -19,3 +19,7 @@ conda activate shapecutter
 ```
 
 And then install shapecutter, as above.
+
+## Testing
+
+See the [testing README](https://github.com/informatics-lab/shapecutter/blob/main/shapecutter/tests/integration/README.md) for more details.
