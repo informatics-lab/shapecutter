@@ -22,4 +22,6 @@ For:
   * one for a rough geometry bounding box cut, and
   * the other for a more precise cut to the outline of the geometry
 
+### A note on coverage
+
 As this tests all the primary functionality offered to the user by this library, this should also act as a sufficient implicit test of individual units of functionality provided by the entire library.
