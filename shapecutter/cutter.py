@@ -122,7 +122,6 @@ class Cutter(object):
             else:
                 raise
         else:
-            print(f"[_boundary] - subset shape: {subset.shape}, mask shape: {mask_2d.shape}")
             result = self.data_provider.apply_mask(subset, mask_2d, dims_2d)
         return result
 
@@ -141,7 +140,6 @@ class Cutter(object):
         """
         # 1. extract subset to the shapefile's bounding box.
         subset = self.geometry_bbox_dataset(geometry_ref)
-        print(f"[cut_dataset] - subset shape: {subset.shape}")
 
         if to == "bbox":
             result = subset
