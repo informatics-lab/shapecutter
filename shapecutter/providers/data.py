@@ -14,15 +14,18 @@ class _DataProvider(object):
     def __repr__(self):
         raise NotImplemented
 
-    def __getattr__(self, attr):
-        return getattr(self.data_source, attr)
-
     def get_xmax(self):
         """Get the maximum value of the x-axis coordinate."""
         raise NotImplemented
 
     def get_axis_name(self, axis):
         """Get the name of the coordinate describing a particular axis."""
+        raise NotImplemented
+
+    def coord(self, name):
+        raise NotImplemented
+
+    def coords(self, kwargs):
         raise NotImplemented
 
     def extract(self, keys):
@@ -56,7 +59,14 @@ class IrisCubeDataProvider(_DataProvider):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             for coord in [x_coord, y_coord]:
-                coord.guess_bounds()
+                if not coord.has_bounds():
+                    coord.guess_bounds()
+
+    def coord(self, name):
+        return self.data_source.coord(name)
+
+    def coords(self, **kwargs):
+        return self.data_source.coords(**kwargs)
 
     def extract(self, keys):
         cstr = iris.Constraint(coord_values=keys)

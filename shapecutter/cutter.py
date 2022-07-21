@@ -106,7 +106,7 @@ class Cutter(object):
             x_lo, x_hi = x_coord[xi].bounds[0]
             y_lo, y_hi = y_coord[yi].bounds[0]
             cell = box(x_lo, y_lo, x_hi, y_hi)
-            mask_point = geometry.intersects(cell)
+            mask_point = cell.intersects(geometry)
             flat_mask.append(mask_point)
 
         return np.array(flat_mask).reshape(dataset.shape[-2:])
