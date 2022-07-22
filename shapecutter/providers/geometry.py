@@ -118,7 +118,7 @@ class GeoPandasGeometryProvider(_GeometryProvider):
 
 
 class ShapelyGeometryProvider(_GeometryProvider):
-    """GeoPandas geometry provider."""
+    """Shapely geometry provider."""
     def __init__(self, geometry_source):
         super().__init__(geometry_source)
         self._names = ["minx", "miny", "maxx", "maxy"]  # Follows geopandas bounds names.

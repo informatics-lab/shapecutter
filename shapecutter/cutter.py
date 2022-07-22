@@ -148,7 +148,7 @@ class Cutter(object):
             # XXX cache the boundary cutting?
             result = self._cut_to_boundary(subset, geometry_ref)
         else:
-            emsg = f"`to` must be one of ['bbox', 'boundary'], got {to}."
+            emsg = f"`to` must be one of ['bbox', 'boundary'], got {to!r}."
             raise ValueError(emsg)
 
         return result
