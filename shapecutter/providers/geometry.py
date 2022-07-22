@@ -2,6 +2,7 @@
 
 import cartopy.io.shapereader as shpreader
 import geopandas as gpd
+from shapely.geometry import LineString, Polygon
 
 
 class _GeometryProvider(object):
@@ -29,9 +30,6 @@ class _GeometryProvider(object):
 
     def __getitem__(self, keys):
         raise NotImplemented
-
-    def __getattr__(self, attr):
-        return getattr(self.geometry_source, attr)
 
     def load(self, source):
         raise NotImplemented
@@ -119,11 +117,45 @@ class GeoPandasGeometryProvider(_GeometryProvider):
         return bounds.loc[bounds.index[0]][bound_ref]
 
 
+class ShapelyGeometryProvider(_GeometryProvider):
+    """Shapely geometry provider."""
+    def __init__(self, geometry_source):
+        super().__init__(geometry_source)
+        self._names = ["minx", "miny", "maxx", "maxy"]  # Follows geopandas bounds names.
+        self._named_bounds = {n: self._names.index(n) for n in self._names}
+
+    def __repr__(self):
+        t = self.__class__.__name__
+        l = len(self.geometry_source)
+        repr_str = f"{t} containing {l} geometries as a Shapely Geometry."
+        return repr_str
+
+    def __getitem__(self, _):
+        return self.geometry_source
+
+    def load(self, _):
+        self.geometry_source = self._geometry_source
+
+    def get_bounds_points(self, geometry_ref):
+        return self.get_bounds(geometry_ref)
+
+    def get_named_bound(self, geometry_ref, bound_ref):
+        bounds = self.get_bounds(geometry_ref)
+        try:
+            bound_idx = self._named_bounds[bound_ref]
+        except KeyError:
+            emsg = f"Expected `bound_ref` to be one of {self._names}, got {bound_ref!r}."
+            raise ValueError(emsg)
+        return bounds[bound_idx]
+
+
 def select_best_geometry_provider(geometry_source):
     if isinstance(geometry_source, shpreader.FionaReader):
         provider = CartopyGeometryProvider(geometry_source)
     elif isinstance(geometry_source, (gpd.geodataframe.GeoDataFrame, str)):
         provider = GeoPandasGeometryProvider(geometry_source)
+    elif isinstance(geometry_source, (LineString, Polygon)):
+        provider = ShapelyGeometryProvider(geometry_source)
     else:
         raise TypeError("No suitable geometry provider found.")
     return provider
